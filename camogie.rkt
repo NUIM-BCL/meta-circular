@@ -12,6 +12,7 @@
                         (cons '- -)
                         (cons '/ /)
                         (cons '* *)
+                        (cons '= =)
                         (cons '< <)
                         (cons '> >)
                         (cons '<= <=)
