@@ -34,9 +34,9 @@
                                (args (map (lambda (a) (eval a env)) params)))
                            (match fp
                              [(list 'closure fparams fbody fenv)
-                                 (eval fbody (extend-env fenv
-                                                        fparams
-                                                        args))]
+                              (eval fbody (extend-env fenv
+                                                      fparams
+                                                      args))]
                              [_ (apply fp args)]))]
     [_ (error "eval: Failed to match expression: " expr)]))
 
@@ -50,7 +50,7 @@
 (define (extend-env env ids vals)
   (let ((bindings (map (lambda (id val) (binding id val)) ids vals)))
     (append bindings env)))
-  
+
 (define (binding id val)
   (cons id val))
 
