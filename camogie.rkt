@@ -31,14 +31,14 @@
                                                (extend-env env
                                                            (list id)
                                                            (list (eval val-expr env))))]
-    [(list f params ...) (let ((fp (eval f env))
-                               (args (map (lambda (a) (eval a env)) params)))
-                           (match fp
-                             [(list 'closure fparams fbody fenv)
-                              (eval fbody (extend-env fenv
-                                                      fparams
-                                                      args))]
-                             [_ (apply fp args)]))]
+    [(list f args ...) (let ((fp (eval f env))
+                             (fargs (map (lambda (a) (eval a env)) args)))
+                         (match fp
+                           [(list 'closure fparams fbody fenv)
+                            (eval fbody (extend-env fenv
+                                                    fparams
+                                                    fargs))]
+                           [_ (apply fp fargs)]))]
     [_ (error "eval: Failed to match expression: " expr)]))
 
 (define (lookup env id)
