@@ -8,11 +8,10 @@
 
 (define (eval expr env)
   (match expr
-    ['+ +]
-    [(? number?) expr]
     [(? symbol?) (lookup env expr)]
-    [(list 'lambda params body) 
-     (list 'closure params body env)]
+    [(? number?) expr]
+    [(list '+ op1 op2) (+ (eval op1 env) (eval op2 env))]
+    [(list 'lambda params body) (list 'closure params body env)]
     [(list 'let id '= val-expr 'in body) 
      (eval body (extend-env env
                             (list id)
@@ -25,7 +24,7 @@
           (eval fbody (extend-env fenv
                                   fparams
                                   fargs))]
-         [_ (apply fp fargs)]))]
+         [_ (error "eval: Applying a non-closure: " fp)]))]
     [_ (error "eval: Failed to match expression: " expr)]))
 
 (define (lookup env id)
