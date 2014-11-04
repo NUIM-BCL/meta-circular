@@ -1,5 +1,6 @@
 #lang racket
 
+;;;;;;;;;;;;; First Attempt (Not so good) ;;;;;;;;;;;;;;;;
 
 (define (new+ a b)
   (if (and (number? a)
@@ -28,18 +29,12 @@
     ['sin sin]
     ['cos cos]
     [(list 'diff f point)
-     (let* ((fp (eval f point))
-            (pointp (eval point env)))
-       (match fp
-         [(list 'lambda params body) 
-          (let* ((liftedfp (lift fp))
-                 (liftedfpp (eval liftedfp env)))
-            (match liftedfpp
-              [(list closure params body env)
-               `(eval (closure ,params ,body ,(lift-env env)) (bundle pointp 1))]
-              [_ (error "eval: Expecting to lift the environment of a closure"
-                        liftedfpp)]))]
-         [_ (error "eval: diff accepts only lambdas" fp)]))]
+     (let* ((liftedf (lift f))
+            (pointp `(bundle ,(eval point env) 1)))
+       (match liftedf
+         [(list 'lambda params body)
+          (eval `(,liftedf ,pointp) (lift-env env))]
+         [_ (error "eval: Failed to match lifted lambda" liftedf)]))]
     [(list 'bundle a1 a2) `(bundle ,(eval a1 env) ,(eval a2 env))]
     [(list 'dual d) (let ((de (eval d env)))
                       (match de
@@ -49,7 +44,8 @@
                         (match ep
                           [(list 'bundle a1 a2) a1]
                           [_ "eval: Failed to match evaluated primal" ep]))]
-    [(? symbol?) (lookup env expr)]
+    [(? symbol?) (or (lookup env expr)
+                     (error ("eval: Failed to look up" expr)))]
     [(? number?) expr]
     [(list 'lambda params body) `(closure ,params ,body ,env)]
     [(list 'let id '= val-expr 'in body) 
@@ -76,22 +72,59 @@
   (match expr
     [(? number?) `(bundle ,expr 0)]
     [(list 'bundle a1 a2) `(bundle ,(lift a1) ,(lift a2))]
-    [(list 'primal p) (let ((liftedp (lift p)))
+    [(list 'primal b) (let ((liftedp (lift b)))
                         (match liftedp
                           [(list 'bundle a1 a2) a1]
                           [_ (error "lift: Failed to match lifted primal:" 
                                     liftedp)]))]
-    [(list 'dual p) (let ((liftedp (lift p)))
+    [(list 'dual b) (let ((liftedp (lift b)))
                       (match liftedp
                         [(list 'bundle a1 a2) a2]
                         [_ (error "lift: Failed to match lifted dual:" 
                                   liftedp)]))]
-    ['sin `(lambda (x) (bundle (sin (primal x)) (* (dual x) (cos (primal x)))))]))
-    
+    ['sin `(lambda (x) (bundle (sin (primal x)) (* (dual x) (cos (primal x)))))]
+    ['+ `(lambda (x y) (bundle (+ (primal x) (primal y)) (+ (dual x) (dual y))))]
+    ['* `(lambda (x y) (bundle (* (primal x) (primal y)) 
+                          (+ (* (primal x) (dual y))
+                             (* (primal y) (dual x)))))]
+    [(list 'lambda params body)
+     (cond [(and (symbol? body) (member body params)) `(lambda ,params ,body)]
+           [(not (free-vars params body)) `(lambda ,params ,(lift body))]
+           [(match body
+              [(list m1 m2 n ...)
+               (if (empty? n)
+                   `(lambda ,params ((,(lift `(lambda ,params ,m1)) ,@params)
+                                (,(lift `(lambda ,params ,m2)) ,@params)))
+                   `(lambda ,params ((,(lift `(lambda ,params (,m1 ,m2))) ,@params)
+                                (,(lift `(lambda ,params ,@n)) ,@params))))])]
+           [#t (error "lift: Failed to lift lambda" expr)])]))
+
+(define (free-vars vars expr)
+  (andmap (lambda (p) (free-var p expr '())) vars))
+            
+(define (free-var var expr env)
+  (match expr
+    [(list 'sin arg) (free-var var arg env)]
+    [(list 'cos arg) (free-var var arg env)]
+    [(list '+ args ...) (ormap (lambda (p) (free-var var p env)) args)]
+    [(list '* args ...) (ormap (lambda (p) (free-var var p env)) args)]
+    [(list 'diff f point) (or (free-var var f env)
+                              (free-var var point env))]
+    [(? number?) #f]
+    [(? symbol?) (if (eq? var expr)
+                     (if (lookup env var) #f #t)
+                     #f)]
+    [(list 'bundle a1 a2) (or (free-var var a1 env) (free-var var a2 env))]
+    [(list 'dual b) (free-var var b env)]
+    [(list 'primal b) (free-var var b env)]
+    [(list 'lambda params body) (free-var var body (extend-env env
+                                                               params
+                                                               (map (lambda (p) '()) params)))]))
+
 (define (lookup env id)
   (match (assoc id env)
     [(cons v l) l]
-    [_ (error "lookup: Failed to lookup identifier:" id)]))
+    [_ #f]))
 
 (define (extend-env env ids vals)
   (let ((bindings (map (lambda (id val) (binding id val)) ids vals)))
