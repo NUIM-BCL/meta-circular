@@ -1,5 +1,26 @@
 #lang racket
 
+
+(define (new+ a b)
+  (if (and (number? a)
+           (number? b))
+      (+ a b)
+      (match a
+        [(list 'bundle a1 a2)
+         (match b
+           [(list 'bundle b1 b2)
+            `(bundle (new+ ,a1 ,b1) (new+ ,a2 ,b2))])])))
+
+(define (new* a b)
+  (if (and (number? a)
+           (number? b))
+      (* a b)
+      (match a
+        [(list 'bundle a1 a2)
+         (match b
+           [(list 'bundle b1 b2)
+            `(bundle (new* ,a1 ,b1) (new* ,a2 ,b2))])])))
+
 (define (eval expr env)
   (match expr
     ['+ new+]
@@ -19,14 +40,14 @@
               [_ (error "eval: Expecting to lift the environment of a closure"
                         liftedfpp)]))]
          [_ (error "eval: diff accepts only lambdas" fp)]))]
-    [(list 'bundle level a1 a2) `(bundle ,level ,(eval a1 env) ,(eval a2 env))]
+    [(list 'bundle a1 a2) `(bundle ,(eval a1 env) ,(eval a2 env))]
     [(list 'dual d) (let ((de (eval d env)))
                       (match de
-                        [(list 'bundle _ a1 a2) a2]
+                        [(list 'bundle a1 a2) a2]
                         [_ "eval: Failed to match evaluated dual" de]))]
     [(list 'primal p) (let ((ep (eval p env)))
                         (match ep
-                          [(list 'bundle _ a1 a2) a1]
+                          [(list 'bundle a1 a2) a1]
                           [_ "eval: Failed to match evaluated primal" ep]))]
     [(? symbol?) (lookup env expr)]
     [(? number?) expr]
@@ -53,8 +74,8 @@
     
 (define (lift expr)
   (match expr
-    [(? number?) `(bundle 1 ,expr 0)]
-    [(list 'bundle level a1 a2) `(bundle ,(+ level 1) ,(lift a1) ,(lift a2))]
+    [(? number?) `(bundle ,expr 0)]
+    [(list 'bundle a1 a2) `(bundle ,(lift a1) ,(lift a2))]
     [(list 'primal p) (let ((liftedp (lift p)))
                         (match liftedp
                           [(list 'bundle a1 a2) a1]
@@ -65,7 +86,7 @@
                         [(list 'bundle a1 a2) a2]
                         [_ (error "lift: Failed to match lifted dual:" 
                                   liftedp)]))]
-    ['sin `(lambda (x) (bundle (sin (primal x)) (* (dual x) (cos (primal x)))))]
+    ['sin `(lambda (x) (bundle (sin (primal x)) (* (dual x) (cos (primal x)))))]))
     
 (define (lookup env id)
   (match (assoc id env)
