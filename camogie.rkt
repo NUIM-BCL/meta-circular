@@ -1,53 +1,25 @@
 #lang racket
 
-;;;;;;;;;;;;;;;;;;;;;; THIS DOESN'T WORK YET ;;;;;;;;;;;;;;;;;;;;;;;;;;
-(define (new+ a b)
-  (if (and (number? a)
-           (number? b))
-      (+ a b)
-      (match a
-        [(list 'bundle level1 a1 a2)
-         (match b
-           [(list 'bundle level2 b1 b2)
-            (if (= level1 level2)
-                `(bundle ,level1 ,(new+ a1 b1) ,(new+ a2 b2))
-                (if (< level1 level2)
-                    (new+ ((compose-n lift (- level2 level1)) a) b)
-                    (new+ ((compose-n lift (- level1 level2)) b) a)))])])))
-
-(define (new* a b)
-  (if (and (number? a)
-           (number? b))
-      (* a b)
-      (match a
-        [(list 'bundle level1 a1 a2)
-         (match b
-           [(list 'bundle level2 b1 b2)
-            (if (= level1 level2)
-                `(bundle ,level1 ,(new* a1 b1) ,(new* a2 b2))
-                (if (< level1 level2)
-                    (new* ((compose-n lift (- level2 level1)) a) b)
-                    (new* ((compose-n lift (- level1 level2)) b) a)))])])))
-
-
-(define (compose-n func n)
-  (foldr (lambda (f c) (compose f c)) func (for/list ([i (- n 1)]) lift)))
-;;;;;;;;;;;;;;;;;;;;;; THIS DOESN'T WORK YET ;;;;;;;;;;;;;;;;;;;;;;;;;;
-
 (define (eval expr env)
   (match expr
     ['+ new+]
     ['* new*]
     ['sin sin]
     ['cos cos]
-    [(list 'diff f p) (let ((fp (eval f env))
-                            (pp (eval p env)))
-                        (eval `((ft ,fp) (bundle 1 ,pp 1)) env))]
-    [(list 'ft c) (match c
-                    [(list 'closure params body env)
-                     `(closure ,params ,body ,(lift-env env))]
-                    [_ (error "eval: Not lifting a closure")])]
-  [(list 'bundle level a1 a2) `(bundle ,level ,(eval a1 env) ,(eval a2 env))]
+    [(list 'diff f point)
+     (let* ((fp (eval f point))
+            (pointp (eval point env)))
+       (match fp
+         [(list 'lambda params body) 
+          (let* ((liftedfp (lift fp))
+                 (liftedfpp (eval liftedfp env)))
+            (match liftedfpp
+              [(list closure params body env)
+               `(eval (closure ,params ,body ,(lift-env env)) (bundle pointp 1))]
+              [_ (error "eval: Expecting to lift the environment of a closure"
+                        liftedfpp)]))]
+         [_ (error "eval: diff accepts only lambdas" fp)]))]
+    [(list 'bundle level a1 a2) `(bundle ,level ,(eval a1 env) ,(eval a2 env))]
     [(list 'dual d) (let ((de (eval d env)))
                       (match de
                         [(list 'bundle _ a1 a2) a2]
@@ -94,8 +66,6 @@
                         [_ (error "lift: Failed to match lifted dual:" 
                                   liftedp)]))]
     ['sin `(lambda (x) (bundle (sin (primal x)) (* (dual x) (cos (primal x)))))]
-    [(list 'sin num) `(,(lift 'sin) ,(lift num))]))
-
     
 (define (lookup env id)
   (match (assoc id env)
