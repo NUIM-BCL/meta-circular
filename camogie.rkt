@@ -67,7 +67,7 @@
     ['* `(lambda (x) (lambda (y) ((bundle ((* (primal x)) (primal y)))
                                 ((+ ((* (primal x)) (dual y)))
                                  ((* (primal y)) (dual x))))))]
-    [(? symbol?) `((bundle x) 0)]
+    [(? symbol?) `((bundle ,expr) 0)]
     [(list 'lambda (list param) body)
      (cond [(and (symbol? body) (eq? body param)) `(lambda (,param) ,body)]
            [(not (free? param body)) `(lambda (,param) ,(lift body))]
