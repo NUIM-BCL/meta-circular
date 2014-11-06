@@ -66,18 +66,7 @@
     ['+ `(lambda (x) (lambda (y) ((bundle ((+ (primal x)) (primal y))) ((+ (dual x)) (dual y)))))]
     ['* `(lambda (x) (lambda (y) ((bundle ((* (primal x)) (primal y)))
                                 ((+ ((* (primal x)) (dual y)))
-                                 ((* (primal y)) (dual x))))))]
-    [(? symbol?) `((bundle ,expr) 0)]
-    [(list 'lambda (list param) body)
-     (cond [(and (symbol? body) (eq? body param)) `(lambda (,param) ,body)]
-           [(not (free? param body)) `(lambda (,param) ,(lift body))]
-           [(match body
-              [(list t1 t2)
-               `(lambda (,param) ((,(lift `(lambda (,param) ,t1)) ,param)
-                             (,(lift `(lambda (,param) ,t2)) ,param)))]
-              [#t (error "lift: Failed to lift lambda" expr)])])]
-    [(list t1 t2) `(,(lift t1) ,(lift t2))]))
-
+                                 ((* (primal y)) (dual x))))))]))
 
 (define (free? var expr)
   (define (free-var-helper var expr stack)
@@ -86,7 +75,7 @@
       [(? symbol?) (if (eq? var expr)
                        (if (member var stack) #f #t)
                        #f)]
-      [(list 'lambda (list param) body) (free-var-helper var body (cons var stack))]
+      [(list 'lambda (list param) body) (free-var-helper var body (cons param stack))]
       [(list t1 t2) (or (free-var-helper var t1 stack) (free-var-helper var t2 stack))]
       [_ (error "free?: Unrecognized expression" expr)]))
   (free-var-helper var expr '()))
