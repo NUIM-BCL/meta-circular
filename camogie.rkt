@@ -47,6 +47,14 @@
     [(? symbol?) (or (lookup env expr)
                      (error ("eval: Failed to look up identifier" expr)))]
     [(? number?) expr]
+    [(list 'diff t1 t2) (eval (expand-sym 'diff 
+                                          (lambda (t1 t2) `((lift ,t1) ((bundle ,t2) 1)))
+                                          expr)
+                              env)]
+    [(list 'lift _) (eval (expand-sym 'lift 
+                                      (lambda (t) (lift t))
+                                      expr)
+                          env)]
     [(list 'lambda param body) `(closure ,@param ,body ,env)]
     [(list f arg) 
      (let ([fp (eval f env)]
@@ -60,9 +68,24 @@
          [_ (error "eval: Expected a closure instead of" fp)]))]
     [_ (error "eval: Failed to match expression" expr)]))
 
+;;; Input: Some expression which contains
+;;; (sym t1 .. tn)
+;;; Output: Replaces (sym t1 .. tn) with (f t1 ... tn),
+;;; that is, the result of applying function f to arguments
+;;; t1 ... tn.
+(define (expand-sym sym f expr)
+  (match expr
+    [(list t) (list (expand-sym sym f t))]
+    [(list t ts ...) (if (eq? t sym)
+                         (apply f (map (lambda (e) (expand-sym sym f e)) ts))
+                         (cons (expand-sym sym f t) 
+                               (map (lambda (e) (expand-sym sym f e)) ts)))]
+    [t t]))
+
 (define (lift expr)
   (match expr
     [(? number?) `((bundle ,expr) 0)]
+    ['lift `(lambda (x) (lift x))]
     ['dual `(lambda (x) (dual x))]
     ['primal `(lambda (x) (primal x))]
     ['bundle `(lambda (x) (lambda (y) ((bundle x) y)))]
