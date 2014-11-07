@@ -27,11 +27,11 @@
     [(list (list '+ t1) t2) (new+ (eval t1 env) (eval t2 env))]
     [(list (list '* t1) t2) (new* (eval t1 env) (eval t2 env))]
     [(list (list 'bundle t1) t2) `((bundle ,(eval t1 env)) ,(eval t2 env))]
-    [(list 'dual t) (let ((tp (eval t env)))
+    [(list 'dual t) (let ([tp (eval t env)])
                       (match tp
                         [(list (list 'bundle b1) b2) b2]
                         [_ "eval: Expected a bundle instead of" tp]))]
-    [(list 'primal t) (let ((tp (eval t env)))
+    [(list 'primal t) (let ([tp (eval t env)])
                         (match tp
                           [(list (list 'bundle b1) b2) b1]
                           [_ "eval: Expected a bundle instead of" tp]))]
@@ -40,8 +40,8 @@
     [(? number?) expr]
     [(list 'lambda param body) `(closure ,@param ,body ,env)]
     [(list f arg) 
-     (let ((fp (eval f env))
-           (argp (eval arg env))) 
+     (let ([fp (eval f env)]
+           [argp (eval arg env)]) 
        (match fp
          [(list 'closure param body cenv)
           (eval body (extend-env cenv
@@ -63,12 +63,52 @@
     ['cos `(lambda (x) ((bundle (cos (primal x)))
                    ((* (dual x)) 
                     ((* -1)(sin (primal x))))))]
-    ['+ `(lambda (x) (lambda (y) ((bundle ((+ (primal x)) (primal y))) ((+ (dual x)) (dual y)))))]
+    ['+ `(lambda (x) (lambda (y) ((bundle ((+ (primal x)) (primal y))) 
+                        ((+ (dual x)) (dual y)))))]
     ['* `(lambda (x) (lambda (y) ((bundle ((* (primal x)) (primal y)))
                                 ((+ ((* (primal x)) (dual y)))
-                                 ((* (primal y)) (dual x))))))]))
+                                 ((* (primal y)) (dual x))))))]
+    [(list 'lambda _ _)
+     (let ([disassembled-lambdas (disassemble-lambdas expr)])
+       (match disassembled-lambdas
+         [(list vars (list body))
+          (cond [(member body vars)(assemble-lambdas vars body)]
+                [(not (free-vars? vars body))
+                 (assemble-lambdas vars (lift body))]
+                [#t (assemble-lambdas 
+                     vars
+                     `(,(assemble-application 
+                         (lift (assemble-lambdas vars (first body)))
+                         vars)
+                       ,(assemble-application 
+                         (lift (assemble-lambdas vars (second body)))
+                         vars)))])]))]
+    [(list f arg) `(,(lift f),(lift arg))]))
 
-(define (free? var expr)
+(define (disassemble-lambdas expr)
+  (letrec ([split-vars-from-body
+            (lambda (expr) (match expr
+                     [(list 'lambda (list param) body)
+                      (cons param (split-vars-from-body body))]
+                     [_ `((,expr))]))])
+    (let-values ([(vars rest) (splitf-at (split-vars-from-body expr) symbol?)])
+      (cons vars rest))))
+
+(define (assemble-lambdas vars body)
+  (letrec ([merge-vars-and-body
+            (lambda (vars body)
+              (if (null? vars)
+                  body
+                  `(lambda (,(car vars)) ,(merge-vars-and-body (rest vars) body))))])
+    (merge-vars-and-body vars body)))
+
+(define (assemble-application body vars)
+  (foldl (lambda (v acc) (list acc v)) body vars))
+
+(define (free-vars? vars expr)
+  (ormap (lambda (p) (free-var? p expr)) vars))
+
+(define (free-var? var expr)
   (define (free-var-helper var expr stack)
     (match expr
       [(? number?) #f]
