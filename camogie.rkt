@@ -8,7 +8,11 @@
         [(list (list 'bundle a1) a2)
          (match b
            [(list (list 'bundle b1) b2)
-            `((bundle ,(new+ a1 b1)) ,(new+ a2 b2))])])))
+            `((bundle ,(new+ a1 b1)) ,(new+ a2 b2))]
+           [_ (error "new+: Expecting a bundle for second argument instead of" 
+                     b)])]
+        [_ (error "new+: Expecting a bundle for first argument instead of" 
+                  a)])))
 
 (define (new* a b)
   (if (and (number? a)
@@ -18,7 +22,11 @@
         [(list (list 'bundle a1) a2)
          (match b
            [(list (list 'bundle b1) b2)
-            `((bundle ,(new* a1 b1)) ,(new* a2 b2))])])))
+            `((bundle ,(new* a1 b1)) ,(new* a2 b2))]
+           [_ (error "new*: Expecting a bundle for second argument instead of" 
+                     b)])]
+        [_ (error "new*: Expecting a bundle for first argument instead of"
+                  a)])))
 
 (define (eval expr env)
   (match expr
@@ -31,15 +39,13 @@
     [(list 'dual t) (let ([tp (eval t env)])
                       (match tp
                         [(list (list 'bundle b1) b2) b2]
-                        [_ "eval: Expected a bundle instead of" tp]))]
+                        [_ (error "eval: Expected a bundle instead of" tp)]))]
     [(list 'primal t) (let ([tp (eval t env)])
                         (match tp
                           [(list (list 'bundle b1) b2) b1]
-                          [_ "eval: Expected a bundle instead of" 
-                             tp]))]
+                          [_ (error "eval: Expected a bundle instead of" tp)]))]
     [(? symbol?) (or (lookup env expr)
-                     (error ("eval: Failed to look up identifier" 
-                             expr)))]
+                     (error ("eval: Failed to look up identifier" expr)))]
     [(? number?) expr]
     [(list 'lambda param body) `(closure ,@param ,body ,env)]
     [(list f arg) 
@@ -85,7 +91,8 @@
                          vars)
                        ,(assemble-application 
                          (lift (assemble-lambdas vars (second body)))
-                         vars)))])]))]
+                         vars)))])]
+         [_ (error "lift: Expecting a lambda instead of" expr)]))]
     [(list f arg) `(,(lift f),(lift arg))]))
 
 ;;; Input: (lambda (x) (lambda (y) ... (lambda (z) M)))
