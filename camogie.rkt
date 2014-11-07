@@ -26,7 +26,8 @@
     ['cos cos]
     [(list (list '+ t1) t2) (new+ (eval t1 env) (eval t2 env))]
     [(list (list '* t1) t2) (new* (eval t1 env) (eval t2 env))]
-    [(list (list 'bundle t1) t2) `((bundle ,(eval t1 env)) ,(eval t2 env))]
+    [(list (list 'bundle t1) t2) `((bundle ,(eval t1 env)) 
+                                   ,(eval t2 env))]
     [(list 'dual t) (let ([tp (eval t env)])
                       (match tp
                         [(list (list 'bundle b1) b2) b2]
@@ -34,9 +35,11 @@
     [(list 'primal t) (let ([tp (eval t env)])
                         (match tp
                           [(list (list 'bundle b1) b2) b1]
-                          [_ "eval: Expected a bundle instead of" tp]))]
+                          [_ "eval: Expected a bundle instead of" 
+                             tp]))]
     [(? symbol?) (or (lookup env expr)
-                     (error ("eval: Failed to look up identifier" expr)))]
+                     (error ("eval: Failed to look up identifier" 
+                             expr)))]
     [(? number?) expr]
     [(list 'lambda param body) `(closure ,@param ,body ,env)]
     [(list f arg) 
@@ -85,23 +88,31 @@
                          vars)))])]))]
     [(list f arg) `(,(lift f),(lift arg))]))
 
+;;; Input: (lambda (x) (lambda (y) ... (lambda (z) M)))
+;;; Output: ((x y ... z) (M))
 (define (disassemble-lambdas expr)
   (letrec ([split-vars-from-body
             (lambda (expr) (match expr
                      [(list 'lambda (list param) body)
                       (cons param (split-vars-from-body body))]
                      [_ `((,expr))]))])
-    (let-values ([(vars rest) (splitf-at (split-vars-from-body expr) symbol?)])
+    (let-values ([(vars rest) 
+                  (splitf-at (split-vars-from-body expr) symbol?)])
       (cons vars rest))))
 
+;;; Input: (x y ... z) M
+;;; Output: (lambda (x) (lambda (y) ... (lambda (z) M)))
 (define (assemble-lambdas vars body)
   (letrec ([merge-vars-and-body
             (lambda (vars body)
               (if (null? vars)
                   body
-                  `(lambda (,(car vars)) ,(merge-vars-and-body (rest vars) body))))])
+                  `(lambda (,(car vars)) ,(merge-vars-and-body (rest vars) 
+                                                          body))))])
     (merge-vars-and-body vars body)))
 
+;;; Input: M (x y ... z)
+;;; Output: (((M x) y) ... z)
 (define (assemble-application body vars)
   (foldl (lambda (v acc) (list acc v)) body vars))
 
@@ -115,8 +126,10 @@
       [(? symbol?) (if (eq? var expr)
                        (if (member var stack) #f #t)
                        #f)]
-      [(list 'lambda (list param) body) (free-var-helper var body (cons param stack))]
-      [(list t1 t2) (or (free-var-helper var t1 stack) (free-var-helper var t2 stack))]
+      [(list 'lambda (list param) body) 
+       (free-var-helper var body (cons param stack))]
+      [(list t1 t2) (or (free-var-helper var t1 stack) 
+                        (free-var-helper var t2 stack))]
       [_ (error "free?: Unrecognized expression" expr)]))
   (free-var-helper var expr '()))
 
