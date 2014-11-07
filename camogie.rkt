@@ -127,18 +127,19 @@
   (ormap (lambda (p) (free-var? p expr)) vars))
 
 (define (free-var? var expr)
-  (define (free-var-helper var expr stack)
-    (match expr
-      [(? number?) #f]
-      [(? symbol?) (if (eq? var expr)
-                       (if (member var stack) #f #t)
-                       #f)]
-      [(list 'lambda (list param) body) 
-       (free-var-helper var body (cons param stack))]
-      [(list t1 t2) (or (free-var-helper var t1 stack) 
-                        (free-var-helper var t2 stack))]
-      [_ (error "free?: Unrecognized expression" expr)]))
-  (free-var-helper var expr '()))
+  (letrec [(free-var-with-stack
+            (lambda (var expr stack)
+              (match expr
+                [(? number?) #f]
+                [(? symbol?) (if (eq? var expr)
+                                 (if (member var stack) #f #t)
+                                 #f)]
+                [(list 'lambda (list param) body) 
+                 (free-var-with-stack var body (cons param stack))]
+                [(list t1 t2) (or (free-var-with-stack var t1 stack) 
+                                  (free-var-with-stack var t2 stack))]
+                [_ (error "free?: Unrecognized expression" expr)])))]
+    (free-var-with-stack var expr '())))
 
 (define (lookup env id)
   (match (assoc id env)
