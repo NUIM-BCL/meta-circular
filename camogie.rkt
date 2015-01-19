@@ -6,18 +6,17 @@
     [(list 'tang t) (let ([tp (eval t env)])
                       (match tp
                         [(list 'bundle b1 b2) b2]
-                        [_ (error "eval: Expected a bundle in dual instead of" tp)]))]
+                        [_ (error "eval: Expected a bundle in tang instead of" tp)]))]
     [(list 'primal t) (let ([tp (eval t env)])
                         (match tp
                           [(list 'bundle b1 b2) b1]
                           [_ (error "eval: Expected a bundle in primal instead of" tp)]))]
     [(? symbol?) (or (lookup env expr)
                      (error ("eval: Failed to look up identifier" expr)))]
-    [(? number?) expr]
     [(list 'lambda params body) `(closure (,@params) ,body ,env)]
     [(list f args ...) 
      (let ([fp (eval f env)]
-           [argsp (map (lambda (a) (eval a env)) args)])
+           [argsp (map (lambda (arg) (eval arg env)) args)])
        (match fp
          [(list 'closure params body cenv)
           (eval body (extend-env cenv
@@ -26,6 +25,30 @@
          [(? procedure?) (apply fp argsp)]
          [_ (error "eval: Cannot apply" fp)]))]
     [_ (error "eval: Failed to match expression" expr)]))
+
+;;; Lift number N, i.e. (num x), C times.
+;;; Example: (lift-num 4 2)
+;;;          => '(bundle (bundle (num 4) (num 0)) (bundle (num 0) (num 0)))
+(define (lift-num n c)
+  (cond [(= c 0) `(num ,n)]
+        [(> c 0) `(bundle ,(lift-num n (- c 1))
+                          ,(lift-num 0 (- c 1)))]))
+
+;;; Lift numeric, i.e. (num x) or (bundle ...), as a constant.
+;;; Example: (lift-numeric-as-const '(bundle (num 3) (num 1)))
+;;;          => '(bundle (bundle (num 3) (num 1)) (bundle (num 0) (num 0)))
+(define (lift-numeric-as-const n)
+  `(bundle ,n ,(zero-out-numeric n)))
+
+
+;;; Replaces all (num x) with (num 0)
+;;; Example: (zero-out-numeric '(bundle (bundle (num 3) (num 2)) (bundle (num 0) (num 4))))
+;;;          => '(bundle (bundle (num 0) (num 0)) (bundle (num 0) (num 0)))
+(define (zero-out-numeric x)
+  (match x
+    [(list 'num _) `(num 0)]
+    [(list 'bundle t1 t2) (list 'bundle (zero-out-numeric t1) 
+                                        (zero-out-numeric t2))]))
 
 (define (lookup env id)
   (match (assoc id env)
