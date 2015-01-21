@@ -26,7 +26,7 @@
     [(? symbol?) (or (lookup env expr)
                      (error ("eval: Failed to look up identifier" expr)))]
     [(list 'lambda params body) `(closure (,@params) ,body ,env)]
-    [(list f args ...) 
+    [(list f args ...)
      (let ([fp (eval f env)]
            [argsp (map (lambda (arg) (eval arg env)) args)])
        (match fp
@@ -41,7 +41,7 @@
 (define (l+ a b)
   (match* (a b)
     [((? number?) (? number?)) (+ a b)]
-    [((list 'bundle a1 a2) (list 'bundle b1 b2)) 
+    [((list 'bundle a1 a2) (list 'bundle b1 b2))
      `(bundle ,(l+ a1 b1) ,(l+ a2 b2))]
     [((list 'num a1) (list 'num b1))
      `(num ,(+ a1 b1))]
@@ -57,7 +57,7 @@
     [(_ _) (error "l*: Expecting bundle or num instead of" a b)]))
 
 (define (lift-env env)
-  (let ((lifted-env 
+  (let ((lifted-env
          (map (lambda (b)
                 (match b
                   [(cons var val)
@@ -65,8 +65,8 @@
                          [(eq? (car val) 'closure)
                           (match val
                             [(list 'closure params body cenv)
-                             (binding var `(closure ,params 
-                                            ,body 
+                             (binding var `(closure ,params
+                                            ,body
                                             ,(lift-env cenv)))]
                             [_ (error "lift-env: Expecting a closure instead of" val)])]
                          [(or (eq? (car val) 'bundle)
@@ -98,7 +98,7 @@
 (define (zero-out-numeric n)
   (match n
     [(list 'num _) `(num 0)]
-    [(list 'bundle t1 t2) (list 'bundle (zero-out-numeric t1) 
+    [(list 'bundle t1 t2) (list 'bundle (zero-out-numeric t1)
                                         (zero-out-numeric t2))]
     [_ (error "zero-out-numeric: Expecting num or bundle instead of" n)]))
 
@@ -116,3 +116,5 @@
 (define (binding id val)
   (cons id val))
 
+(provide proto-env)
+(provide eval)
