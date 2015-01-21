@@ -4,8 +4,8 @@
 
 (define (eval expr env)
   (match expr
-    [(list '+ a b) (l+ a b)]
-    [(list '* a b) (l* a b)]
+    [(list '+ a b) (l+ (eval a env) (eval b env))]
+    [(list '* a b) (l* (eval a env) (eval b env))]
     [(list 'D f a) (eval `(tang ((lift ,f) (bundle ,a (num 1)))) env)]
     [(list 'lift f) (let ([fp (eval f env)])
                       (match fp
@@ -45,7 +45,7 @@
      `(bundle ,(l+ a1 b1) ,(l+ a2 b2))]
     [((list 'num a1) (list 'num b1))
      `(num ,(+ a1 b1))]
-    [(_ _) ("l+: Expecting bundle or num instead of" a b)]))
+    [(_ _) (error "l+: Expecting bundle or num instead of" a b)]))
 
 (define (l* a b)
   (match* (a b)
@@ -54,10 +54,28 @@
      `(bundle ,(l* a1 b1) ,(l+ (l* a1 b2) (l* a2 b1)))]
     [((list 'num a1) (list 'num b1))
      `(num ,(* a1 b1))]
-    [(_ _) ("l*: Expecting bundle or num instead of" a b)]))
+    [(_ _) (error "l*: Expecting bundle or num instead of" a b)]))
 
-(define (lift-env env) #f)                  
-                              
+(define (lift-env env)
+  (let ((lifted-env 
+         (map (lambda (b)
+                (match b
+                  [(cons var val)
+                   (cond [(eq? var 'num) (cons var (+ val 1))]
+                         [(eq? (car val) 'closure)
+                          (match val
+                            [(list 'closure params body cenv)
+                             (binding var `(closure ,params 
+                                            ,body 
+                                            ,(lift-env cenv)))]
+                            [_ (error "lift-env: Expecting a closure instead of" val)])]
+                         [(or (eq? (car val) 'bundle)
+                              (eq? (car val) 'num))
+                          (binding var (lift-numeric-as-const val))]
+                         [#t (error "lift-env: Unknown element" binding "in env")])]
+                  [_ (error "lift-env: Expecting binding instead of" binding)]))
+              env)))
+    (append lifted-env env)))
 
 ;;; Lift number N, i.e. (num x), C times.
 ;;; Example: (lift-num 4 2)
@@ -81,7 +99,8 @@
   (match n
     [(list 'num _) `(num 0)]
     [(list 'bundle t1 t2) (list 'bundle (zero-out-numeric t1) 
-                                        (zero-out-numeric t2))]))
+                                        (zero-out-numeric t2))]
+    [_ (error "zero-out-numeric: Expecting num or bundle instead of" n)]))
 
 (define (lookup env id)
   (match (assoc id env)
