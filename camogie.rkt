@@ -4,8 +4,17 @@
 
 (define (eval expr env)
   (match expr
+    [(list 'sin a) (lsin (eval a env))]
+    [(list 'cos a) (lcos (eval a env))]
     [(list '+ a b) (l+ (eval a env) (eval b env))]
     [(list '* a b) (l* (eval a env) (eval b env))]
+    [(list 'let id '= val-expr 'in body) (eval body
+                                               (extend-env env
+                                                           (list id)
+                                                           (list (eval val-expr env))))]
+    [(list 'D2 f a) (eval `(tang (tang ((lift (lift ,f)) (bundle (bundle ,a (num 1))
+                                                                 (bundle (num 1) (num 0))))))
+                          env)]
     [(list 'D f a) (eval `(tang ((lift ,f) (bundle ,a (num 1)))) env)]
     [(list 'lift f) (let ([fp (eval f env)])
                       (match fp
@@ -38,6 +47,18 @@
          [_ (error "eval: Cannot apply" fp)]))]
     [_ (error "eval: Failed to match expression" expr)]))
 
+(define (lsin a)
+  (match a
+    [(list 'num a1) `(num ,(sin a1))]
+    [(list 'bundle a1 a2) `(bundle ,(lsin a1) ,(l* a2 (lcos a1)))]
+    [_ (error "lsin: Expecting a num or bundle instead of" a)]))
+
+(define (lcos a)
+  (match a
+    [(list 'num a1) `(num ,(cos a1))]
+    [(list 'bundle a1 a2) `(bundle ,(lsin a1) ,(l* a2 (l* '(num -1) (lsin a1))))]
+    [_ (error "lsin: Expecting a num or bundle instead of" a)]))
+
 (define (l+ a b)
   (match* (a b)
     [((? number?) (? number?)) (+ a b)]
@@ -45,7 +66,7 @@
      `(bundle ,(l+ a1 b1) ,(l+ a2 b2))]
     [((list 'num a1) (list 'num b1))
      `(num ,(+ a1 b1))]
-    [(_ _) (error "l+: Expecting bundle or num instead of" a b)]))
+    [(_ _) (error "l+: Expecting bundle or num instead of" a "and" b)]))
 
 (define (l* a b)
   (match* (a b)
@@ -54,7 +75,9 @@
      `(bundle ,(l* a1 b1) ,(l+ (l* a1 b2) (l* a2 b1)))]
     [((list 'num a1) (list 'num b1))
      `(num ,(* a1 b1))]
-    [(_ _) (error "l*: Expecting bundle or num instead of" a b)]))
+    [((list 'num _) (list 'bundle b1 b2)) `(bundle ,(l* a b1) ,(l* a b2))]
+    [((list 'bundle a1 a2) (list 'num _)) `(bundle ,(l* b a1) ,(l* b a2))]
+    [(_ _) (error "l*: Expecting bundle or num instead of" a "and" b)]))
 
 (define (lift-env env)
   (let ((lifted-env
