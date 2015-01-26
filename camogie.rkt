@@ -20,7 +20,7 @@
                       (match fp
                         [(list 'closure params body cenv)
                          (list 'closure params body (lift-env cenv))]
-                        [_ (error "Coudl not lift" f)]))]
+                        [_ (error "Could not lift" f)]))]
     [(list 'num n) expr (let ([c (lookup env 'num)])
                            (lift-num n c))]
     [(list 'bundle t1 t2) `(bundle ,(eval t1 env) ,(eval t2 env))]
