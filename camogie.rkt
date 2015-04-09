@@ -4,30 +4,33 @@
 
 (define (eval expr env)
   (match expr
-    [(list 'sin a) (lsin (eval a env))]
-    [(list 'cos a) (lcos (eval a env))]
-    [(list '+ a b) (l+ (eval a env) (eval b env))]
-    [(list '* a b) (l* (eval a env) (eval b env))]
+    ;; BEGIN global environment
+    ['sin lsin]
+    ['cos lcos]
+    ['+ l+]
+    ['* l*]
+    ['lift llift]
+    ;; END global environment
     [(list 'let id '= val-expr 'in body) (eval body
                                                (extend-env env
                                                            (list id)
                                                            (list (eval val-expr env))))]
+    ;; not special form, move out of eval:
     [(list 'D2 f a) (eval `(tang (tang ((lift (lift ,f)) (bundle (bundle ,a (num 1))
                                                                  (bundle (num 1) (num 0))))))
                           env)]
+    ;; not special form, move out of eval:
     [(list 'D f a) (eval `(tang ((lift ,f) (bundle ,a (num 1)))) env)]
-    [(list 'lift f) (let ([fp (eval f env)])
-                      (match fp
-                        [(list 'closure params body cenv)
-                         (list 'closure params body (lift-env cenv))]
-                        [_ (error "Could not lift" f)]))]
     [(list 'num n) expr (let ([c (lookup env 'num)])
                            (lift-num n c))]
+    ;; not special form, move out of eval:
     [(list 'bundle t1 t2) `(bundle ,(eval t1 env) ,(eval t2 env))]
+    ;; not special form, move out of eval:
     [(list 'tang t) (let ([tp (eval t env)])
                       (match tp
                         [(list 'bundle b1 b2) b2]
                         [_ (error "eval: Expected a bundle in tang instead of" tp)]))]
+    ;; not special form, move out of eval:
     [(list 'primal t) (let ([tp (eval t env)])
                         (match tp
                           [(list 'bundle b1 b2) b1]
@@ -38,14 +41,24 @@
     [(list f args ...)
      (let ([fp (eval f env)]
            [argsp (map (lambda (arg) (eval arg env)) args)])
-       (match fp
-         [(list 'closure params body cenv)
-          (eval body (extend-env cenv
-                                 params
-                                 argsp))]
-         [(? procedure?) (apply fp argsp)]
-         [_ (error "eval: Cannot apply" fp)]))]
+       (c-apply fp argsp))]
     [_ (error "eval: Failed to match expression" expr)]))
+
+(define (c-apply fp argsp)
+  (match fp
+    [(list 'closure params body cenv)
+     (eval body (extend-env cenv
+                            params
+                            argsp))]
+    [(? procedure?) (apply fp argsp)]
+    [_ (error "eval: Cannot apply" fp)]))
+
+(define (llift fp)
+  (match fp
+    [(list 'closure params body cenv)
+     (list 'closure params body (lift-env cenv))]
+    [(? procedure?) fp]
+    [_ (error "Could not lift" fp)]))
 
 (define (lsin a)
   (match a
@@ -141,3 +154,4 @@
 
 (provide proto-env)
 (provide eval)
+(provide c-apply)
