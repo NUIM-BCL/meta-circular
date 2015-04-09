@@ -7,34 +7,28 @@
     ;; BEGIN global environment
     ['sin lsin]
     ['cos lcos]
+    ['exp lexp]
     ['+ l+]
     ['* l*]
     ['lift llift]
+    ['bundle bundle]
+    ['tang tang]
+    ['primal primal]
+    ;; User-level globally-defined functions, not special forms:
+    ['D2 (eval '(lambda (f a)
+                  (tang (tang ((lift (lift f))
+                               (bundle (bundle a (num 1))
+                                       (bundle (num 1) (num 0)))))))
+               proto-env)]
+    ['D (eval '(lambda (f a) (tang ((lift f) (bundle a (num 1))))) proto-env)]
+    ['diff (eval '(lambda (f) (lambda (x) (D f x))) proto-env)]
     ;; END global environment
     [(list 'let id '= val-expr 'in body) (eval body
                                                (extend-env env
                                                            (list id)
                                                            (list (eval val-expr env))))]
-    ;; not special form, move out of eval:
-    [(list 'D2 f a) (eval `(tang (tang ((lift (lift ,f)) (bundle (bundle ,a (num 1))
-                                                                 (bundle (num 1) (num 0))))))
-                          env)]
-    ;; not special form, move out of eval:
-    [(list 'D f a) (eval `(tang ((lift ,f) (bundle ,a (num 1)))) env)]
     [(list 'num n) expr (let ([c (lookup env 'num)])
                            (lift-num n c))]
-    ;; not special form, move out of eval:
-    [(list 'bundle t1 t2) `(bundle ,(eval t1 env) ,(eval t2 env))]
-    ;; not special form, move out of eval:
-    [(list 'tang t) (let ([tp (eval t env)])
-                      (match tp
-                        [(list 'bundle b1 b2) b2]
-                        [_ (error "eval: Expected a bundle in tang instead of" tp)]))]
-    ;; not special form, move out of eval:
-    [(list 'primal t) (let ([tp (eval t env)])
-                        (match tp
-                          [(list 'bundle b1 b2) b1]
-                          [_ (error "eval: Expected a bundle in primal instead of" tp)]))]
     [(? symbol?) (or (lookup env expr)
                      (error ("eval: Failed to look up identifier" expr)))]
     [(list 'lambda params body) `(closure (,@params) ,body ,env)]
@@ -60,23 +54,43 @@
     [(? procedure?) fp]
     [_ (error "Could not lift" fp)]))
 
+(define (bundle p t)
+  `(bundle ,p ,t))
+
+(define (primal tp)
+  (match tp
+    [(list 'bundle b1 b2) b1]
+    [_ (error "primal: Expected a bundle instead of" tp)]))
+
+(define (tang tp)
+  (match tp
+    [(list 'bundle b1 b2) b2]
+    [_ (error "tang: Expecting a bundle instead of" tp)]))
+
 (define (lsin a)
   (match a
     [(list 'num a1) `(num ,(sin a1))]
-    [(list 'bundle a1 a2) `(bundle ,(lsin a1) ,(l* a2 (lcos a1)))]
+    [(list 'bundle a1 a2) (bundle (lsin a1) (l* a2 (lcos a1)))]
     [_ (error "lsin: Expecting a num or bundle instead of" a)]))
 
 (define (lcos a)
   (match a
     [(list 'num a1) `(num ,(cos a1))]
-    [(list 'bundle a1 a2) `(bundle ,(lsin a1) ,(l* a2 (l* '(num -1) (lsin a1))))]
-    [_ (error "lsin: Expecting a num or bundle instead of" a)]))
+    [(list 'bundle a1 a2) (bundle (lsin a1) (l* a2 (l* '(num -1) (lsin a1))))]
+    [_ (error "lcos: Expecting a num or bundle instead of" a)]))
+
+(define (lexp a)
+  (match a
+    [(list 'num a1) `(num ,(exp a1))]
+    [(list 'bundle a1 a2) (let ((z (lexp a1)))
+                            (bundle z (l* a2 z)))]
+    [_ (error "lexp: Expecting a num or bundle instead of" a)]))
 
 (define (l+ a b)
   (match* (a b)
     [((? number?) (? number?)) (+ a b)]
     [((list 'bundle a1 a2) (list 'bundle b1 b2))
-     `(bundle ,(l+ a1 b1) ,(l+ a2 b2))]
+     (bundle (l+ a1 b1) (l+ a2 b2))]
     [((list 'num a1) (list 'num b1))
      `(num ,(+ a1 b1))]
     [(_ _) (error "l+: Expecting bundle or num instead of" a "and" b)]))
@@ -85,11 +99,11 @@
   (match* (a b)
     [((? number?) (? number?)) (* a b)]
     [((list 'bundle a1 a2) (list 'bundle b1 b2))
-     `(bundle ,(l* a1 b1) ,(l+ (l* a1 b2) (l* a2 b1)))]
+     (bundle (l* a1 b1) (l+ (l* a1 b2) (l* a2 b1)))]
     [((list 'num a1) (list 'num b1))
      `(num ,(* a1 b1))]
-    [((list 'num _) (list 'bundle b1 b2)) `(bundle ,(l* a b1) ,(l* a b2))]
-    [((list 'bundle a1 a2) (list 'num _)) `(bundle ,(l* b a1) ,(l* b a2))]
+    [((list 'num _) (list 'bundle b1 b2)) (bundle (l* a b1) (l* a b2))]
+    [((list 'bundle a1 a2) (list 'num _)) (bundle (l* b a1) (l* b a2))]
     [(_ _) (error "l*: Expecting bundle or num instead of" a "and" b)]))
 
 (define (lift-env env)
@@ -118,14 +132,14 @@
 ;;;          => '(bundle (bundle (num 4) (num 0)) (bundle (num 0) (num 0)))
 (define (lift-num n c)
   (cond [(= c 0) `(num ,n)]
-        [(> c 0) `(bundle ,(lift-num n (- c 1))
-                          ,(lift-num 0 (- c 1)))]))
+        [(> c 0) (bundle (lift-num n (- c 1))
+                         (lift-num 0 (- c 1)))]))
 
 ;;; Lift numeric N, i.e. (num x) or (bundle ...), as a constant.
 ;;; Example: (lift-numeric-as-const '(bundle (num 3) (num 1)))
 ;;;          => '(bundle (bundle (num 3) (num 1)) (bundle (num 0) (num 0)))
 (define (lift-numeric-as-const n)
-  `(bundle ,n ,(zero-out-numeric n)))
+  (bundle n (zero-out-numeric n)))
 
 
 ;;; Replaces all (num x) with (num 0)
