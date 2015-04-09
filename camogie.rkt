@@ -89,7 +89,7 @@
   (match n
     [(? number? ) 0]
     [(list 'bundle t1 t2) (list 'bundle (zero-out-numeric t1)
-                                        (zero-out-numeric t2))]
+                                (zero-out-numeric t2))]
     [_ (error "zero-out-numeric: Expecting num or bundle instead of" n)]))
 
 (define (env-lift env)
@@ -117,9 +117,9 @@
   (match expr
     [(list 'let id '= val-expr 'in body)
      (%eval body
-           (env-extend env
-                       (list id)
-                       (list (%eval val-expr env))))]
+            (env-extend env
+                        (list id)
+                        (list (%eval val-expr env))))]
     [(? number?) (lift-numeric-as-const-n (env-lift-count env) expr)]
     [(? symbol?) (or (env-lookup env expr)
                      (error ("%eval: failed to look up identifier" expr)))]
@@ -132,8 +132,8 @@
   (match f
     [(list 'closure params body cenv)
      (%eval body (env-extend cenv
-                            params
-                            args))]
+                             params
+                             args))]
     [(? procedure?) (apply f args)]
     [_ (error "%apply: cannot apply" f "to" args)]))
 
@@ -148,14 +148,14 @@
                       '(D D2 diff)
                       (list
                        (%eval '(lambda (f a) (tang ((lift f) (bundle a 1))))
-                             proto-env)
+                              proto-env)
                        (%eval '(lambda (f a)
-                                (tang (tang ((lift (lift f))
-                                             (bundle (bundle a 1)
-                                                     (bundle 1 0))))))
-                             proto-env)
+                                 (tang (tang ((lift (lift f))
+                                              (bundle (bundle a 1)
+                                                      (bundle 1 0))))))
+                              proto-env)
                        (%eval '(lambda (f) (lambda (a) (tang ((lift f) (bundle a 1)))))
-                             proto-env)))])
+                              proto-env)))])
     proto-env))
 
 (define (eval expr) (%eval expr proto-env))
