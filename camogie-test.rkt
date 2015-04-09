@@ -1,27 +1,26 @@
 #lang racket
 
-;;; To run the test suite, execute 'racket camogie.rkt'.
+;;; To run the test suite, execute 'racket camogie-test.rkt'.
 
 (require rackunit "camogie.rkt")
 
-(check-equal? (eval '(D (lambda (x) (* x (D (lambda (y) (+ x y)) (num 1)))) (num 1)) proto-env)
-              '(num 1))
+(check-equal? (eval '(D (lambda (x) (* x (D (lambda (y) (+ x y)) 1))) 1))
+              '1)
 
-(check-equal? (eval '(D (lambda (x) x) (num 7)) proto-env)
-              '(num 1))
+(check-equal? (eval '(D (lambda (x) x) 7))
+              '1)
 
-(check-equal? (eval '(D (lambda (x) (num 3)) (num 7)) proto-env)
-              '(num 0))
+(check-equal? (eval '(D (lambda (x) 3) 7))
+              '0)
 
-(check-equal? (eval '(D (lambda (x) (+ x (num 1))) (num 7)) proto-env)
-              '(num 1))
+(check-equal? (eval '(D (lambda (x) (+ x 1)) 7))
+              '1)
 
-(check-equal? (eval '(D (lambda (x) (* x (D (lambda (y) (+ (* (num 2) x) y)) (num 3)))) (num 7))
-                    proto-env)
-              '(num 1))
+(check-equal? (eval '(D (lambda (x) (* x (D (lambda (y) (+ (* 2 x) y)) 3))) 7))
+              '1)
 
-(check-equal? (eval '(D (lambda (x) (* x (D (lambda (y) (* x y)) (num 3)))) (num 7)) proto-env)
-              '(num 14))
+(check-equal? (eval '(D (lambda (x) (* x (D (lambda (y) (* x y)) 3))) 7))
+              14)
 
-(check-equal? (eval '(D (lambda (y) (D (lambda (x) (* x (* x y))) (* y (num 2)))) (num 2)) proto-env)
-              '(num 16))
+(check-equal? (eval '(D (lambda (y) (D (lambda (x) (* x (* x y))) (* y 2))) 2))
+              16)
