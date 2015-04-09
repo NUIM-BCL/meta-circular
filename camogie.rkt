@@ -124,10 +124,8 @@
     [(? symbol?) (or (env-lookup env expr)
                      (error ("%eval: failed to look up identifier" expr)))]
     [(list 'lambda params body) `(closure (,@params) ,body ,env)]
-    [(list f args ...)
-     (let ([fp (%eval f env)]
-           [argsp (map (lambda (arg) (%eval arg env)) args)])
-       (%apply fp argsp))]
+    [(list f args ...) (%apply (%eval f env)
+                               (map (lambda (arg) (%eval arg env)) args))]
     [_ (error "%eval: failed to match expression" expr)]))
 
 (define (%apply f args)
