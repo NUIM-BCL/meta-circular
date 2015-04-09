@@ -90,7 +90,7 @@
          (map (lambda (b)
                 (match b
                   [(cons var val)
-                   (cond [(eq? var 'num) (cons var (+ val 1))]
+                   (cond [(eq? var 'num) (binding var (+ val 1))]
                          [(procedure? val) b]
                          [(eq? (car val) 'closure)
                           (match val
