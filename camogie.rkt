@@ -1,28 +1,7 @@
 #lang racket
 
-(define proto-env '((num . 0)))
-
 (define (eval expr env)
   (match expr
-    ;; BEGIN global environment
-    ['sin lsin]
-    ['cos lcos]
-    ['exp lexp]
-    ['+ l+]
-    ['* l*]
-    ['lift llift]
-    ['bundle bundle]
-    ['tang tang]
-    ['primal primal]
-    ;; User-level globally-defined functions, not special forms:
-    ['D2 (eval '(lambda (f a)
-                  (tang (tang ((lift (lift f))
-                               (bundle (bundle a (num 1))
-                                       (bundle (num 1) (num 0)))))))
-               proto-env)]
-    ['D (eval '(lambda (f a) (tang ((lift f) (bundle a (num 1))))) proto-env)]
-    ['diff (eval '(lambda (f) (lambda (x) (D f x))) proto-env)]
-    ;; END global environment
     [(list 'let id '= val-expr 'in body) (eval body
                                                (extend-env env
                                                            (list id)
@@ -166,6 +145,25 @@
 
 (define (binding id val)
   (cons id val))
+
+(define proto-env
+  (let* ((proto-env '((num . 0)))
+         (proto-env (extend-env proto-env
+                                '(sin cos exp + * lift bundle tang primal)
+                                (list lsin lcos lexp l+ l* llift bundle tang primal)))
+         (proto-env (extend-env proto-env
+                                '(D2 D diff)
+                                (list
+                                 (eval '(lambda (f a)
+                                          (tang (tang ((lift (lift f))
+                                                       (bundle (bundle a (num 1))
+                                                               (bundle (num 1) (num 0)))))))
+                                       proto-env)
+                                 (eval '(lambda (f a) (tang ((lift f) (bundle a (num 1)))))
+                                       proto-env)
+                                 (eval '(lambda (f) (lambda (a) (tang ((lift f) (bundle a (num 1))))))
+                                       proto-env)))))
+    proto-env))
 
 (provide proto-env)
 (provide eval)
